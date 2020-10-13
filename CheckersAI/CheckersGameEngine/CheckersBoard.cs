@@ -609,8 +609,7 @@ namespace CheckersAI.CheckersGameEngine
 //            if (winSide != CheckerSide.none)
 //            {
 //                return _currentPlayer;
-//            }
-
+//            }//
 //            QueueUpdate();
 
 //            return null;
