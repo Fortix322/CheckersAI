@@ -6,6 +6,7 @@ namespace CheckersAI.CheckersGameEngine
     {
         public void Print();
     }
+
     public enum CheckersRulesEnum : sbyte
     {
         rus = 8 
