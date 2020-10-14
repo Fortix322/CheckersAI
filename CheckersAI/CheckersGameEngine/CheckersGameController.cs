@@ -64,7 +64,7 @@ namespace CheckersAI.CheckersGameEngine
                 coord = Console.ReadLine();
                 try
                 {
-                    CheckerSide winner = checkers.Move(playersArray[ind], coord);
+                    CheckerSide winner = checkers.DoMove(playersArray[ind], coord);
                     if (winner == CheckerSide.none) Console.WriteLine($"{playersArray[ind].checkerSide} - winner");
                     else if(winner == CheckerSide.black) ind = 0;
                     else ind = 1;

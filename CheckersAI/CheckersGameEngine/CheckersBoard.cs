@@ -82,8 +82,7 @@ namespace CheckersAI.CheckersGameEngine
 
                 if (Math.Abs(finishPos.y - startPos.y) == beatInterval && Math.Abs(finishPos.x - startPos.x) == beatInterval)
                 {
-                    int enemy = _field[startPos.y, startPos.x] == (sbyte)CheckerSide.black ? 1 : -1;
-                    if (_field[middlePoint.y, middlePoint.x] == (sbyte)((CheckerSide)(_field[startPos.y, startPos.x]) + enemy))
+                    if (_field[middlePoint.y, middlePoint.x] == (sbyte)_nextPlayer.checkerSide)
                     {
                         return true;
                     }
@@ -135,30 +134,55 @@ namespace CheckersAI.CheckersGameEngine
             return players;
         }
 
-        //public CheckerSide DoMove(CheckersPlayer caller,string coordinates)
-        //{
-        //    Exception WrongMoveException = new Exception("Wrong move");
-        //    Exception WrongPlayerException = new Exception("Not your queue or player don't play");
-        //    Coordinates startPos = new Coordinates(-1, -1);
-        //    Coordinates finishPos = new Coordinates(-1, -1);
-        //    try
-        //    {
-        //        if (!ReferenceEquals(caller, _currentPlayer)) throw WrongMoveException;
+        public CheckerSide DoMove(CheckersPlayer caller, string coordinates)
+        {
+            Exception WrongMoveException = new Exception("Wrong move");
+            Exception WrongPlayerException = new Exception("Not your queue or player don't play");
+            Coordinates startPos = new Coordinates(-1, -1);
+            Coordinates finishPos = new Coordinates(-1, -1);
+            Checker currentChecker;
+            try
+            {
+                if (!ReferenceEquals(caller, _currentPlayer)) throw WrongMoveException;
 
-        //        ParseCoordinates(coordinates,ref startPos,ref finishPos);
+                ParseCoordinates(coordinates, ref startPos, ref finishPos);
 
-        //        Move()
+                if((currentChecker = FindChecker(startPos)) != null)
+                {
+                    if (_currentPlayer.checkerSide == currentChecker.checkerSide)
+                    {
+                        Move(startPos, finishPos, currentChecker);
 
-        //    }
-        //    catch (IndexOutOfRangeException ex)
-        //    {
-        //        throw ex;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        throw ex;
-        //    }
-        //}
+                        CheckerSide winSide = CheckWin();
+                        if (winSide != CheckerSide.none)
+                        {
+                            return winSide;
+                        }
+                        
+                        MovesDelete();
+
+                        CheckersListUpdate(currentChecker, finishPos);
+
+                        MovesUpdate();
+
+                        QueueUpdate();
+
+                    }
+
+                }
+
+                return CheckerSide.none;
+
+            }
+            catch (IndexOutOfRangeException ex)
+            {
+                throw ex;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
 
         public void StartGame()
         {
@@ -172,77 +196,40 @@ namespace CheckersAI.CheckersGameEngine
         /// <summary>
         ///     Moves checkers on board
         /// </summary>
-        /// <returns> Side which must do next move or in case of winner
-        /// returns CheckerSide.none which means that current player is winner,
-        /// in case of error throw an exception </returns>
         ///  <param name = "caller"> Object which does func call </param>
         ///  <param name = "coordinates"> What and where checker must be placed </param>
-        private CheckerSide Move(CheckersPlayer caller, string coordinates)
+        private void Move(Coordinates startPos, Coordinates finishPos,Checker currentChecker)
         {
-            Checker currentChecker;
-            Coordinates startPos = new Coordinates(-1, -1);
-            Coordinates finishPos = new Coordinates(-1, -1);
             Exception WrongMoveException = new Exception("Wrong move");
             Exception WrongPlayerException = new Exception("Not your queue or player don't play");
 
             try
             {
-                if (!ReferenceEquals(caller, _currentPlayer)) throw WrongPlayerException;
-
-                ParseCoordinates(coordinates, ref startPos, ref finishPos);
-
-                if ((currentChecker = FindChecker(startPos)) != null)
+                Coordinates dictValueCoord = new Coordinates(-1, -1);
+                if (currentChecker.availableMoves.TryGetValue(finishPos, out dictValueCoord) &&
+                    startPos.Equals(dictValueCoord))
                 {
-                    if (caller.checkerSide == currentChecker.checkerSide)
-                    {
-                        Coordinates dictValueCoord = new Coordinates(-1, -1);
-                        if (currentChecker.availableMoves.TryGetValue(finishPos, out dictValueCoord) &&
-                            startPos.Equals(dictValueCoord))
-                        {
-                            _field[finishPos.y, finishPos.x] = (sbyte)caller.checkerSide;
-                            _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
-                        }
-                        else if (currentChecker.availableBeat.TryGetValue(finishPos, out dictValueCoord) &&
-                                 startPos.Equals(dictValueCoord))
-                        {
-                            Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (startPos.y + finishPos.y)), (sbyte)(0.5 * (startPos.x + finishPos.x)));
-
-                            _field[finishPos.y, finishPos.x] = (sbyte)caller.checkerSide;
-                            _field[middlePoint.y, middlePoint.x] = (sbyte)CheckerSide.none;
-                            _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
-
-                            CheckersListUpdate(middlePoint);
-
-                        }
-                        else goto wrongMove;
-
-                        CheckerSide winSide = CheckWin();
-                        if (winSide != CheckerSide.none)
-                        {
-                            return CheckerSide.none;
-                        }
-
-                        MovesDelete();
-
-                        CheckersListUpdate(currentChecker, finishPos);
-
-                        writeToFile(startPos, finishPos, _currentPlayer);
-
-                        MovesUpdate();
-
-                        QueueUpdate();
-
-                        return _currentPlayer.checkerSide;
-                    }
+                    _field[finishPos.y, finishPos.x] = (sbyte)_currentPlayer.checkerSide;
+                    _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
                 }
+                else if (currentChecker.availableBeat.TryGetValue(finishPos, out dictValueCoord) &&
+                         startPos.Equals(dictValueCoord))
+                {
+                    Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (startPos.y + finishPos.y)), (sbyte)(0.5 * (startPos.x + finishPos.x)));
+              
+                    _field[finishPos.y, finishPos.x] = (sbyte)_currentPlayer.checkerSide;
+                    _field[middlePoint.y, middlePoint.x] = (sbyte)CheckerSide.none;
+                    _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
+              
+                    CheckersListUpdate(middlePoint);
+              
+                }
+                else throw WrongMoveException;
 
-            /*GOTO POINT*/
-            wrongMove:
-                throw WrongMoveException;
             }
             catch (IndexOutOfRangeException ex)
             {
-                throw ex;
+                throw WrongMoveException;
             }
             catch (Exception ex)
             {
@@ -256,7 +243,6 @@ namespace CheckersAI.CheckersGameEngine
             foreach(Checker ch in _checkers)
             {
                 sbyte directionY = ch.checkerSide == CheckerSide.black ? (sbyte)1 : (sbyte)-1;
-                sbyte beatInterval = 2;
                 Coordinates finalPos = new Coordinates(-1, -1);
 
                 finalPos.y = (sbyte)(ch.checkerCoordinates.y + directionY);
@@ -269,23 +255,13 @@ namespace CheckersAI.CheckersGameEngine
                     }
                 }
 
-                for (int i = 0, directionX = 2; i < 4; i++,directionX *= -1)
-                {
-                    if (i % 2 == 0) beatInterval *= -1;
-                    finalPos.y = (sbyte)(ch.checkerCoordinates.y + beatInterval);
-                    finalPos.x = (sbyte)(ch.checkerCoordinates.x + directionX);
-                    if (CanBeat(ch.checkerCoordinates, finalPos))
-                    {
-                        ch.availableBeat.Add(finalPos, ch.checkerCoordinates);
-                    }
-                }
+                FindAvailableBeats(ch.checkerCoordinates, ch.availableBeat);
             }
         }
 
         private void MovesUpdate(Checker checker)
         {
             sbyte directionY = checker.checkerSide == CheckerSide.black ? (sbyte)1 : (sbyte)-1;
-            sbyte beatInterval = 2;
             Coordinates finalPos = new Coordinates(-1, -1);
 
             finalPos.y = (sbyte)(checker.checkerCoordinates.y + directionY);
@@ -299,18 +275,32 @@ namespace CheckersAI.CheckersGameEngine
             }
 
 
+            FindAvailableBeats(checker.checkerCoordinates, checker.availableBeat);
+        }
+
+        private void FindAvailableBeats(Coordinates startPos,Dictionary<Coordinates,Coordinates> availableBeat)
+        {
+            sbyte beatInterval = 2;
+            Coordinates finalPos = new Coordinates(-1, -1);
+
             for (int i = 0, directionX = 2; i < 4; i++, directionX *= -1)
             {
                 if (i % 2 == 0) beatInterval *= -1;
-                finalPos.y = (sbyte)(checker.checkerCoordinates.y + beatInterval);
-                finalPos.x = (sbyte)(checker.checkerCoordinates.x + directionX);
-                if (CanBeat(checker.checkerCoordinates, finalPos))
+                finalPos.y = (sbyte)(startPos.y + beatInterval);
+                finalPos.x = (sbyte)(startPos.x + directionX);
+                if (CanBeat(startPos, finalPos))
                 {
-                    checker.availableBeat.Add(finalPos, checker.checkerCoordinates);
+                    Coordinates oldStartPos;
+                    if (availableBeat.TryGetValue(startPos, out oldStartPos) == false) oldStartPos = new Coordinates(-1, -1);
+                    if (!(finalPos.Equals(oldStartPos)))
+                    {
+                        availableBeat.Add(finalPos, startPos);
+                        FindAvailableBeats(finalPos, availableBeat);
+                    }
                 }
             }
         }
-
+       
         private void MovesDelete()
         {
             foreach(Checker ch in _checkers)
@@ -457,31 +447,36 @@ namespace CheckersAI.CheckersGameEngine
 
         private void FieldPrep()
         {
-            sbyte playerRows = (sbyte)((_fieldsize.y - 2) / 2);
+            //sbyte playerRows = (sbyte)((_fieldsize.y - 2) / 2);
 
 
-            bool set;
-            sbyte playerIndex = (sbyte)CheckerSide.black;
-            for (int i = 0; i < _fieldsize.y; i++)
-            {
-                set = !(i % 2 == 0);
+            //bool set;
+            //sbyte playerIndex = (sbyte)CheckerSide.black;
+            //for (int i = 0; i < _fieldsize.y; i++)
+            //{
+            //    set = !(i % 2 == 0);
 
-                if (i == playerRows)
-                {
-                    i += 2;
-                    playerIndex = (sbyte)CheckerSide.white;
-                }
-                for (int j = 0; j < _fieldsize.x; j++)
-                {
-                    if (set)
-                    {
-                        _field[i, j] = playerIndex;
-                        set = false;
-                    }
-                    else set = true;
-                }
+            //    if (i == playerRows)
+            //    {
+            //        i += 2;
+            //        playerIndex = (sbyte)CheckerSide.white;
+            //    }
+            //    for (int j = 0; j < _fieldsize.x; j++)
+            //    {
+            //        if (set)
+            //        {
+            //            _field[i, j] = playerIndex;
+            //            set = false;
+            //        }
+            //        else set = true;
+            //    }
 
-            }
+            //}
+            _field[5, 5] = 2;
+            _field[4, 4] = 1;
+            _field[2, 2] = 1;
+
+
 
         }
 
