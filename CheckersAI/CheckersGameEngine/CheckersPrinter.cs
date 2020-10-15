@@ -6,7 +6,7 @@ namespace CheckersAI.CheckersGameEngine
 {
     //TODO: Сделать хороший интерфейс управления,в котором будет печататься консоль а ниже будут отображаться последние 15 
     // выведенных сообщений 
-    public class CheckersPrinter : IPrintable
+    internal class CheckersPrinter : IPrintable
     {
         private CheckersBoard mainBoard;
         private CheckersPlayer[] players;

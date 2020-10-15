@@ -37,7 +37,7 @@ namespace CheckersAI.CheckersGameEngine
         {
             CheckersPlayer[] playersArray = new CheckersPlayer[amountOfPlayers];
             playersArray[0] = new Player(CheckerSide.black);
-            playersArray[1] = new AI(CheckerSide.white);
+            playersArray[1] = new Player(CheckerSide.white);
             CheckersBoard checkers = new CheckersBoard(CheckersRulesEnum.rus,playersArray);
             CheckersPrinter print = new CheckersPrinter(checkers);
             checkers.StartGame();
@@ -58,14 +58,12 @@ namespace CheckersAI.CheckersGameEngine
 
             int a = 1;
             int ind = 1;
-            string coord;
 
             while (true)
             {
-                coord = Console.ReadLine();
                 try
                 {
-                    CheckerSide winner = checkers.DoMove(playersArray[ind], coord);
+                    playersArray[ind].DoMove();
                     print.Print();
                     a *= -1;
                     ind += a;

@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using System.Diagnostics;
 
 namespace CheckersAI.CheckersGameEngine
 {
-    public class CheckersBoard : IPrintable
+    internal class CheckersBoard : IPrintable
     {
         /*** FIELDS ***/
 
@@ -41,6 +42,7 @@ namespace CheckersAI.CheckersGameEngine
             for (int i = 0; i < CheckersGameController.amountOfPlayers; i++)
             {
                 _players[i] = (CheckersPlayer)playersArray[i];
+                _players[i].boardOwner = this;
                 if (_players[i].checkerSide == CheckerSide.white) _currentPlayer = _players[i];
                 else _nextPlayer = _players[i];
             }
@@ -82,7 +84,7 @@ namespace CheckersAI.CheckersGameEngine
 
                 if (Math.Abs(finishPos.y - startPos.y) == beatInterval && Math.Abs(finishPos.x - startPos.x) == beatInterval)
                 {
-                    CheckerSide enemySide = (CheckerSide)_field[startPos.y,startPos.x] == CheckerSide.black ? CheckerSide.white : CheckerSide.black;
+                    CheckerSide enemySide = _nextPlayer.checkerSide == CheckerSide.black ? CheckerSide.white : CheckerSide.black;
                     if (_field[middlePoint.y, middlePoint.x] == (sbyte)enemySide)
                     {
                         return true;
@@ -542,7 +544,7 @@ namespace CheckersAI.CheckersGameEngine
 
     }
 
-    public class Checker
+    internal class Checker
     {
         private CheckerType _checkerType;
         private CheckerSide _checkerSide;
@@ -597,7 +599,7 @@ namespace CheckersAI.CheckersGameEngine
 
     }
 
-    public struct Coordinates
+    internal struct Coordinates
     {
         public sbyte x;
         public sbyte y;
