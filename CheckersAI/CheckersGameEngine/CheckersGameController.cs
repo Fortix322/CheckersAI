@@ -56,6 +56,7 @@ namespace CheckersAI.CheckersGameEngine
             //checkers.Move(playersArray[1], "e3;c1");
             print.Print();
 
+            int a = 1;
             int ind = 1;
             string coord;
 
@@ -65,10 +66,9 @@ namespace CheckersAI.CheckersGameEngine
                 try
                 {
                     CheckerSide winner = checkers.DoMove(playersArray[ind], coord);
-                    if (winner == CheckerSide.none) Console.WriteLine($"{playersArray[ind].checkerSide} - winner");
-                    else if(winner == CheckerSide.black) ind = 0;
-                    else ind = 1;
                     print.Print();
+                    a *= -1;
+                    ind += a;
                 }
                 catch (Exception ex)
                 {
