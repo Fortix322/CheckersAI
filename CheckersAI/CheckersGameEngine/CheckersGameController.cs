@@ -9,7 +9,7 @@ namespace CheckersAI.CheckersGameEngine
 
     public enum CheckersRulesEnum : sbyte
     {
-        rus = 8 
+        rus = 8
     }
 
     public enum PlayerTypeEnum
@@ -38,35 +38,22 @@ namespace CheckersAI.CheckersGameEngine
             CheckersPlayer[] playersArray = new CheckersPlayer[amountOfPlayers];
             playersArray[0] = new Player(CheckerSide.black);
             playersArray[1] = new Player(CheckerSide.white);
-            CheckersBoard checkers = new CheckersBoard(CheckersRulesEnum.rus,playersArray);
+            CheckersBoard checkers = new CheckersBoard(CheckersRulesEnum.rus,playersArray,true);
             CheckersPrinter print = new CheckersPrinter(checkers);
             checkers.StartGame();
-            //checkers.Move(playersArray[1], "f2;e3");
-            //print.Print();
-
-            //checkers.Move(playersArray[0], "c3;d2");
-            //print.Print();
-
-            //checkers.Move(playersArray[1], "f6;e7");
-            //print.Print();
-
-            //checkers.Move(playersArray[0], "c1;d0");
-            //print.Print();
-
-            //checkers.Move(playersArray[1], "e3;c1");
+            
             print.Print();
 
-            int a = 1;
             int ind = 1;
 
             while (true)
             {
                 try
                 {
-                    playersArray[ind].DoMove();
+                    CheckerSide moveNow = playersArray[ind].DoMove();
                     print.Print();
-                    a *= -1;
-                    ind += a;
+                    if (playersArray[0].checkerSide == moveNow) ind = 0;
+                    else ind = 1;
                 }
                 catch (Exception ex)
                 {
