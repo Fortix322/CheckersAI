@@ -21,7 +21,7 @@ namespace CheckersAI.CheckersGameEngine
     public enum CheckerType
     {
         ordinary,
-        king
+        queen
     }
 
     public enum CheckerSide

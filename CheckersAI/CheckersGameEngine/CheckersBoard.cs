@@ -17,7 +17,6 @@ namespace CheckersAI.CheckersGameEngine
 
         private List<Checker> _checkers = new List<Checker>();
 
-
         private CheckersPlayer[] _players;
 
         private CheckersPlayer _currentPlayer;
@@ -244,10 +243,18 @@ namespace CheckersAI.CheckersGameEngine
                     currentChecker.availableMoves.Remove(finishPos);
 
                     if (currentChecker.availableMoves.Count == 0) _currentPlayer.EditMovableChecker(currentChecker, false);
+                    TurnsToQueen();
                     return _nextPlayer.checkerSide;
                 }
                 else if (currentChecker.availableBeat.TryGetValue(finishPos, out dictValueCoord))
                 {
+                    if (_beatRule)
+                    {
+                        if (currentChecker.availableBeat.ContainsValue(finishPos))
+                        {
+                            throw new ArgumentException($"You must finish beat");
+                        }
+                    }
                     if (startPos.Equals(dictValueCoord))
                     {
                         Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (startPos.y + finishPos.y)), (sbyte)(0.5 * (startPos.x + finishPos.x)));
@@ -260,6 +267,7 @@ namespace CheckersAI.CheckersGameEngine
                         currentChecker.availableBeat.Remove(finishPos);
 
                         if (currentChecker.availableBeat.Count == 0) _currentPlayer.EditCheckerCanBeat(currentChecker, false);
+                        TurnsToQueen();
                         return _nextPlayer.checkerSide;
                     }
                     else
@@ -267,6 +275,13 @@ namespace CheckersAI.CheckersGameEngine
                         Coordinates localStartPos;
                         Coordinates localFinishPos = finishPos;
                         Stack<Coordinates> finishCoordinates = new Stack<Coordinates>();
+                        if (_beatRule)
+                        {
+                            if (currentChecker.availableBeat.ContainsValue(localFinishPos))
+                            {
+                                throw new ArgumentException($"You must finish beat");
+                            }
+                        }
                         while (currentChecker.availableBeat.TryGetValue(localFinishPos, out localStartPos))
                         {
                             if (localStartPos.Equals(startPos))
@@ -483,6 +498,18 @@ namespace CheckersAI.CheckersGameEngine
                 if (_checkers.Remove(checker)) return true;
 
             return false;
+        }
+
+        private void TurnsToQueen(Coordinates finishPos,Checker ch)
+        {
+            if(ch.checkerSide == CheckerSide.black)
+            {
+                if (finishPos.y == _fieldsize.y - 1) ch.checkerType = CheckerType.queen;
+            } 
+            else if(ch.checkerSide == CheckerSide.white)
+            {
+                if (finishPos.y == 0) ch.checkerType = CheckerType.queen;
+            }
         }
 
         private bool ParseCoordinates(string coordinates,ref Coordinates startPos,ref Coordinates finishPos)
