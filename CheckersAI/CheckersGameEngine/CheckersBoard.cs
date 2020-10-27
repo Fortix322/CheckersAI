@@ -2,701 +2,250 @@
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
-using System.Diagnostics;
+using System.Threading;
 
 namespace CheckersAI.CheckersGameEngine
 {
-    internal class CheckersBoard : IPrintable
+    public enum CheckersFieldSize
     {
-        /*** FIELDS ***/
+        Small = 6,
+        Medium = 8,
+        Large = 10
+    }
 
-        // PRIVATE FIELDS
+    public enum CheckersPlayerType
+    {
+        Ai,
+        Player,
+        NetworkPlayer
+    }
 
-        private readonly bool _beatRule;
-        private readonly (sbyte x, sbyte y) _fieldsize;
+    public enum CheckersPlayerSide
+    {
+        None = 0,
+        White,
+        Black 
+    }
 
-        private List<Checker> _checkers = new List<Checker>();
-
-        private CheckersPlayer[] _players;
-
-        private CheckersPlayer _currentPlayer;
-        private CheckersPlayer _nextPlayer;
-
-        private CheckersRulesEnum _rulesType;
-
-        private sbyte[,] _field;
-
-        /*** METHODS ***/
-
-        // CONSTUCTORS
-
-        public CheckersBoard(CheckersRulesEnum rules, CheckersPlayer[] playersArray,bool BeatRule)
+    public enum CheckersTypes
+    {
+        whiteOrdinary = 1,
+        blackOrdinary = 2,
+        whiteQueen = 3,
+        blackQueen = 4,
+        emptyField = 0
+    }
+    public class CheckersBoard
+    {
+        private int fieldSize;
+        private int[,] fieldArray;
+        private CheckersPlayer whitePlayer;
+        private CheckersPlayer blackPlayer;
+        public CheckersBoard(CheckersFieldSize size,CheckersPlayerType white, CheckersPlayerType black)
         {
-            _rulesType = rules;
-            _beatRule = BeatRule;
-
-            _fieldsize = ((sbyte)_rulesType, (sbyte)_rulesType);
-
-            _field = new sbyte[_fieldsize.y, _fieldsize.x];
-
-            _players = new CheckersPlayer[CheckersGameController.amountOfPlayers];
-
-            for (int i = 0; i < CheckersGameController.amountOfPlayers; i++)
-            {
-                _players[i] = (CheckersPlayer)playersArray[i];
-                _players[i].boardOwner = this;
-                if (_players[i].checkerSide == CheckerSide.white) _currentPlayer = _players[i];
-                else _nextPlayer = _players[i];
-            }
-
-
+            fieldSize = (int)size;
+            fieldArray = FieldBuilding(fieldSize);
+            SetPlayers( out whitePlayer, white, out blackPlayer, black);
         }
 
-        // PUBLIC METHODS
-
-        public bool CanMove(Coordinates startPos, Coordinates finishPos)
+        public CheckersPlayerSide MainGameLoopStart(bool necessaryBeat)
         {
-            try
-            {
-                if (_field[finishPos.y, finishPos.x] != (sbyte)CheckerSide.none) return false;
+            CheckersPlayer currentPlayer = whitePlayer;
+            (int x, int y) start,finish;
 
-                int yPosInterval = (CheckerSide)_field[startPos.y, startPos.x] == CheckerSide.black ? 1 : -1;
 
-                if (finishPos.y - startPos.y == yPosInterval && Math.Abs(finishPos.x - startPos.x) == 1)
-                {
-                    return true;
-                }
-                return false;
-            }
-            catch (IndexOutOfRangeException ex)
+            while (true)
             {
-                return false;
+                currentPlayer.DoMove(out start, out finish);
+                Console.WriteLine($"{ProcessMove(start, finish, currentPlayer)},{currentPlayer.playerSide}");
+                currentPlayer = ChangeMove(currentPlayer);
             }
         }
 
-        public bool CanBeat(Coordinates startPos, Coordinates finishPos,CheckerSide checkerSide)
+        private bool ProcessMove((int x, int y) start,(int x, int y) finish,CheckersPlayer currentPlayer)
         {
+            if(CanMove(fieldArray,start,finish,currentPlayer.playerSide))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanMove(int[,] field,(int x, int y) start, (int x, int y) finish, CheckersPlayerSide currentPlayerSide)
+        {
+            if (currentPlayerSide == CheckersPlayerSide.None) return false;
+            else if (field[finish.y, finish.x] != (int)CheckersTypes.emptyField) return false;
             try
             {
-                if (_field[finishPos.y, finishPos.x] != (sbyte)CheckerSide.none) return false;
-
-                int beatInterval = 2;
-
-                Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (startPos.y + finishPos.y)), (sbyte)(0.5 * (startPos.x + finishPos.x)));
-
-                if (Math.Abs(finishPos.y - startPos.y) == beatInterval && Math.Abs(finishPos.x - startPos.x) == beatInterval)
+                int yDifference = currentPlayerSide == CheckersPlayerSide.White ? -1 : 1;
+                if (finish.y - start.y == yDifference && Math.Abs(finish.x - start.x) == 1)
                 {
-                    int enemySide = checkerSide == CheckerSide.black ? 1 : -1; 
-                    if (_field[middlePoint.y, middlePoint.x] == (sbyte)checkerSide + enemySide)
+                    if ((yDifference == -1 && (field[start.y, start.x] == (int)CheckersTypes.whiteOrdinary || field[start.y, start.x] == (int)CheckersTypes.whiteQueen)) ||
+                       (yDifference == 1 && (field[start.y, start.x] == (int)CheckersTypes.blackOrdinary || field[start.y, start.x] == (int)CheckersTypes.blackQueen)))
                     {
                         return true;
                     }
                 }
+
+            }
+            catch (Exception ex) { 
                 return false;
             }
-            catch (IndexOutOfRangeException ex)
-            {
-                return false;
-            }
-        }
-
-        public void Print()
-        {
-            Console.Write("  ");
-            for (int i = 0; i < _fieldsize.x; i++)
-            {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write(i);
-            }
-            Console.WriteLine();
-            Console.WriteLine();
-
-            Console.ResetColor();
-            for (int i = 0; i < _fieldsize.y; i++)
-            {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"{(char)('A' + i)} ");
-                Console.ResetColor();
-
-                for (int j = 0; j < _fieldsize.x; j++) Console.Write(_field[i, j]);
-                Console.Write('\n');
-            }
-        }
-
-        public CheckersPlayer GetCurrentPlayer()
-        {
-            return _currentPlayer;
-        }
-
-        /// <summary>
-        /// Returns array of players
-        /// </summary>
-        /// <returns> CheckersPlayer array with 2 players </returns>
-        public CheckersPlayer[] GetPlayers()
-        {
-            CheckersPlayer[] players = new CheckersPlayer[CheckersGameController.amountOfPlayers];
-            for (int i = 0; i < players.Length; i++) players[i] = (CheckersPlayer)_players[i].Clone();
-            return players;
-        }
-
-        public CheckerSide DoMove(CheckersPlayer caller, string coordinates)
-        {
-            Exception WrongMoveException = new Exception("Wrong move");
-            Exception WrongPlayerException = new Exception("Not your queue or player don't play");
-            Coordinates startPos = new Coordinates(-1, -1);
-            Coordinates finishPos = new Coordinates(-1, -1);
-            Checker currentChecker;
-            try
-            {
-                if (!ReferenceEquals(caller, _currentPlayer)) throw WrongMoveException;
-
-                ParseCoordinates(coordinates, ref startPos, ref finishPos);
-
-                if((currentChecker = FindChecker(startPos)) != null)
-                {
-                    if (_currentPlayer.checkerSide == currentChecker.checkerSide)
-                    {
-                        CheckerSide nextMove = Move(startPos, finishPos, currentChecker);
-
-                        CheckerSide winSide = CheckWin();
-                        if (winSide != CheckerSide.none)
-                        {
-                            _currentPlayer.IsWinner = true;
-                            return CheckerSide.none;
-                        }
-                        
-                        CheckersListUpdate(currentChecker, finishPos);
-
-                        if (_beatRule)
-                        {
-                            if (_currentPlayer.getCheckersCanBeatCount() == 0)
-                            {
-                                MovesDelete();
-
-                                MovesUpdate();
-
-                                QueueUpdate();
-
-                            }
-                        }
-                        else
-                        {
-                            MovesDelete();
-
-                            MovesUpdate();
-
-                            QueueUpdate();
-                        }
-
-                        return _currentPlayer.checkerSide;
-                    }
-                   
-
-                }
-
-                throw WrongMoveException;
-
-            }
-            catch (IndexOutOfRangeException ex)
-            {
-                throw ex;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-        
-        public void StartGame()
-        {
-            FieldPrep();
-            CheckerPrep(_checkers);
-            MovesUpdate();
-
-        }
-
-        // PRIVATE METHODS
-
-        /// <summary>
-        ///     Moves checkers on board
-        /// </summary>
-        /// <return> Return side whick must move next </return>
-        ///  <param name = "caller"> Object which does func call </param>
-        ///  <param name = "coordinates"> What and where checker must be placed </param>
-        private CheckerSide Move(Coordinates startPos, Coordinates finishPos,Checker currentChecker)
-        {
-            Exception WrongMoveException = new Exception("Wrong move");
-            Exception WrongPlayerException = new Exception("Not your queue or player don't play");
+            return false;
             
-            try
+        }
+
+        private int[,] FieldBuilding(int fieldSize)
+        {
+            bool oddRow;
+            int teamDistance = (fieldSize - 2) / 2;
+            int[,] fieldArray = new int[fieldSize,fieldSize];
+            int checkers = (int)CheckersTypes.blackOrdinary;
+            for(int i = 0;i < fieldSize; i++)
             {
-                Coordinates dictValueCoord = new Coordinates(-1, -1);
-                if (currentChecker.availableMoves.TryGetValue(finishPos, out dictValueCoord) &&
-                    startPos.Equals(dictValueCoord))
+                if (i == teamDistance)
                 {
-                    if(_beatRule && _currentPlayer.getCheckersCanBeatCount() != 0)
-                    {
-                        throw new Exception("You must beat all available checkers");
-                    }
-                    _field[finishPos.y, finishPos.x] = (sbyte)_currentPlayer.checkerSide;
-                    _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
-                    currentChecker.availableMoves.Remove(finishPos);
-
-                    if (currentChecker.availableMoves.Count == 0) _currentPlayer.EditMovableChecker(currentChecker, false);
-                    TurnsToQueen();
-                    return _nextPlayer.checkerSide;
-                }
-                else if (currentChecker.availableBeat.TryGetValue(finishPos, out dictValueCoord))
-                {
-                    if (_beatRule)
-                    {
-                        if (currentChecker.availableBeat.ContainsValue(finishPos))
-                        {
-                            throw new ArgumentException($"You must finish beat");
-                        }
-                    }
-                    if (startPos.Equals(dictValueCoord))
-                    {
-                        Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (startPos.y + finishPos.y)), (sbyte)(0.5 * (startPos.x + finishPos.x)));
-
-                        _field[finishPos.y, finishPos.x] = (sbyte)_currentPlayer.checkerSide;
-                        _field[middlePoint.y, middlePoint.x] = (sbyte)CheckerSide.none;
-                        _field[startPos.y, startPos.x] = (sbyte)CheckerSide.none;
-
-                        CheckersListUpdate(middlePoint);
-                        currentChecker.availableBeat.Remove(finishPos);
-
-                        if (currentChecker.availableBeat.Count == 0) _currentPlayer.EditCheckerCanBeat(currentChecker, false);
-                        TurnsToQueen();
-                        return _nextPlayer.checkerSide;
-                    }
-                    else
-                    {
-                        Coordinates localStartPos;
-                        Coordinates localFinishPos = finishPos;
-                        Stack<Coordinates> finishCoordinates = new Stack<Coordinates>();
-                        if (_beatRule)
-                        {
-                            if (currentChecker.availableBeat.ContainsValue(localFinishPos))
-                            {
-                                throw new ArgumentException($"You must finish beat");
-                            }
-                        }
-                        while (currentChecker.availableBeat.TryGetValue(localFinishPos, out localStartPos))
-                        {
-                            if (localStartPos.Equals(startPos))
-                            {
-                                while(currentChecker.availableBeat.TryGetValue(localFinishPos, out localStartPos))
-                                {
-                                    Coordinates middlePoint = new Coordinates((sbyte)(0.5 * (localStartPos.y + localFinishPos.y)), (sbyte)(0.5 * (localStartPos.x + localFinishPos.x)));
-
-                                    
-                                    _field[middlePoint.y, middlePoint.x] = (sbyte)CheckerSide.none;
-                                    _field[localStartPos.y, localStartPos.x] = (sbyte)CheckerSide.none;
-
-                                    CheckersListUpdate(middlePoint);
-
-                                    currentChecker.availableBeat.Remove(localFinishPos);
-
-                                    if (localFinishPos.Equals(finishPos))
-                                    {
-                                        _field[localFinishPos.y, localFinishPos.x] = (sbyte)_currentPlayer.checkerSide;
-                                        if (currentChecker.availableBeat.Count == 0) _currentPlayer.EditCheckerCanBeat(currentChecker, false);
-                                        return _nextPlayer.checkerSide;
-
-                                    }
-                                    localFinishPos = finishCoordinates.Pop();
-                                }
-                            }
-                            finishCoordinates.Push(localFinishPos);
-                            localFinishPos = localStartPos;
-                        }
-                        throw WrongMoveException;
-
-                    }
-
-                }
-                else throw WrongMoveException;
-
-                throw WrongMoveException;
-            }
-            catch (IndexOutOfRangeException ex)
-            {
-                throw WrongMoveException;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-
-        }
-
-        private void MovesUpdate()
-        {
-            foreach(Checker ch in _checkers)
-            {
-                sbyte directionY = ch.checkerSide == CheckerSide.black ? (sbyte)1 : (sbyte)-1;
-                Coordinates finalPos = new Coordinates(-1, -1);
-
-                finalPos.y = (sbyte)(ch.checkerCoordinates.y + directionY);
-                for (int i = 0,directionX = 1; i < 2; i++,directionX *= -1)
-                {
-                    finalPos.x = (sbyte)(ch.checkerCoordinates.x + directionX);
-                    if (CanMove(ch.checkerCoordinates, finalPos))
-                    {
-                        ch.availableMoves.Add(finalPos, ch.checkerCoordinates);
-                    }
-                }
-
-                if(ch.availableMoves.Count != 0)
-                {
-                    if(_currentPlayer.checkerSide == ch.checkerSide)
-                        _currentPlayer.EditMovableChecker(ch, true);
-                    else _nextPlayer.EditMovableChecker(ch, true);
-
-                }
-
-                if (FindAvailableBeats(ch.checkerCoordinates, ch.availableBeat,ch.checkerSide))
-                {
-                    if (_currentPlayer.checkerSide == ch.checkerSide)
-                        _currentPlayer.EditCheckerCanBeat(ch, true);
-                    else _nextPlayer.EditCheckerCanBeat(ch, true);
-                }
-                Console.WriteLine();
-            }
-        }
-
-        private void MovesUpdate(Checker checker)
-        {
-            sbyte directionY = checker.checkerSide == CheckerSide.black ? (sbyte)1 : (sbyte)-1;
-            Coordinates finalPos = new Coordinates(-1, -1);
-
-            finalPos.y = (sbyte)(checker.checkerCoordinates.y + directionY);
-            for (int i = 0, directionX = 1; i < 2; i++, directionX *= -1)
-            {
-                finalPos.x = (sbyte)(checker.checkerCoordinates.x + directionX);
-                if (CanMove(checker.checkerCoordinates, finalPos))
-                {
-                    checker.availableMoves.Add(finalPos, checker.checkerCoordinates);
-                }
-            }
-
-            if (checker.availableMoves.Count != 0)
-            {
-                if (_currentPlayer.checkerSide == checker.checkerSide)
-                    _currentPlayer.EditMovableChecker(checker, true);
-                else _nextPlayer.EditMovableChecker(checker, true);
-            }
-
-            if (FindAvailableBeats(checker.checkerCoordinates, checker.availableBeat,checker.checkerSide))
-            {
-                if (_currentPlayer.checkerSide == checker.checkerSide)
-                    _currentPlayer.EditCheckerCanBeat(checker, true);
-                else _nextPlayer.EditCheckerCanBeat(checker, true);
-            }
-        }
-
-        private bool FindAvailableBeats(Coordinates startPos,Dictionary<Coordinates,Coordinates> availableBeat,CheckerSide checkerSide)
-        {
-            sbyte beatInterval = 2;
-            Coordinates finalPos = new Coordinates(-1, -1);
-
-            for (int i = 0, directionX = 2; i < 4; i++, directionX *= -1)
-            {
-                if (i % 2 == 0) beatInterval *= -1;
-                finalPos.y = (sbyte)(startPos.y + beatInterval);
-                finalPos.x = (sbyte)(startPos.x + directionX);
-                if (CanBeat(startPos, finalPos, checkerSide))
-                {
-                    Coordinates oldStartPos;
-                    if (availableBeat.TryGetValue(startPos, out oldStartPos) == false) oldStartPos = new Coordinates(-1, -1);
-                    if (!(finalPos.Equals(oldStartPos)))
-                    {
-                        availableBeat.Add(finalPos, startPos);
-                        FindAvailableBeats(finalPos, availableBeat,checkerSide);
-                    }
-                }
-            }
-            if (availableBeat.Count > 0) return true;
-            else return false;
-        }
-       
-        private void MovesDelete()
-        {
-            foreach(Checker ch in _checkers)
-            {
-                ch.availableMoves.Clear();
-                ch.availableBeat.Clear();
-            }
-            _currentPlayer.RemoveAllCheckerCanBeat();
-            _currentPlayer.RemoveAllMovableChecker();
-        }
-        
-        private Checker FindChecker(Coordinates coordinates)
-        {
-            foreach(Checker ch in _checkers)
-            {
-                if(ch.checkerCoordinates.x == coordinates.x && ch.checkerCoordinates.y == coordinates.y)
-                {
-                    return ch;
-                }
-            }
-            return null;
-        }
-
-        private CheckerSide CheckWin()
-        {
-            int blackCount = 0;
-            int whiteCount = 0;
-
-            foreach(Checker checker in _checkers)
-            {
-                if (checker.checkerSide == CheckerSide.black) blackCount++;
-                else whiteCount++;
-            }
-
-            if (blackCount == 0) return CheckerSide.white;
-            else if (whiteCount == 0) return CheckerSide.black;
-            else return CheckerSide.none;
-        }
-
-        // replace checker in list;
-        private bool CheckersListUpdate(Coordinates startPos, Coordinates finishPos)
-        {
-            Checker checker = FindChecker(startPos);
-            if (checker != null)
-            {
-                checker.checkerCoordinates = finishPos;
-                return true;
-            }
-            return false;
-        }
-
-        private bool CheckersListUpdate(Checker checker,Coordinates finishPos)
-        {
-   
-            if (checker != null)
-            {
-                checker.checkerCoordinates = finishPos;
-                return true;
-            }
-            return false;
-        }
-        // delete checker from list;
-        private bool CheckersListUpdate(Coordinates pos)
-        {
-            Checker checker = FindChecker(pos);
-            if (checker != null)
-                if(_checkers.Remove(checker)) return true;
-            
-            return false;
-        }
-
-        private bool CheckersListUpdate(Checker checker)
-        {
-            if (checker != null)
-                if (_checkers.Remove(checker)) return true;
-
-            return false;
-        }
-
-        private void TurnsToQueen(Coordinates finishPos,Checker ch)
-        {
-            if(ch.checkerSide == CheckerSide.black)
-            {
-                if (finishPos.y == _fieldsize.y - 1) ch.checkerType = CheckerType.queen;
-            } 
-            else if(ch.checkerSide == CheckerSide.white)
-            {
-                if (finishPos.y == 0) ch.checkerType = CheckerType.queen;
-            }
-        }
-
-        private bool ParseCoordinates(string coordinates,ref Coordinates startPos,ref Coordinates finishPos)
-        {
-            Exception WrongCoordinatesException = new Exception("Coordinates example : A1;B0");
-
-            int YPos = -1;
-            int XPos = -1;
-
-            int firstNumInd = -1;
-            int secondNumInd = -1;
-
-            bool anotherPos = false;
-
-            for (int i = 0; i < coordinates.Length; i++)
-            {
-                if (Char.IsLetter(coordinates[i]))
-                {
-                    YPos = coordinates.ToUpper()[i] - 'A';
+                    i++;
+                    checkers = (int)CheckersTypes.whiteOrdinary;
                     continue;
                 }
-                else if (Char.IsDigit(coordinates[i]))
+                oddRow = (i % 2 != 0);
+                for(int j = 0;j < fieldSize; j++)
                 {
-                    if (firstNumInd == -1)
-                    {
-                        firstNumInd = i;
-                    }
-                    if( !(i + 1 < coordinates.Length) || !Char.IsDigit(coordinates[i + 1]))
-                    {
-                        secondNumInd = i;
-                    }
-                    if (secondNumInd != -1)
-                    {
-                        int substrLen = secondNumInd - firstNumInd + 1;
-                        if(XPos != -1) throw WrongCoordinatesException;
-                        XPos = int.Parse(coordinates.Substring(firstNumInd, substrLen));
-                        firstNumInd = -1;
-                        secondNumInd = -1;
-                    }
-                }
-                else if (coordinates[i].Equals(';'))
-                {
-                    if (YPos == -1 || XPos == -1) break;
-                    anotherPos = true;
-                    startPos.y = (sbyte)YPos;
-                    startPos.x = (sbyte)XPos;
-                    YPos = XPos = -1;
-                }
-                else if(coordinates[i] != ' ')
-                {
-                    throw new Exception($"Unexpected symbol : {coordinates[i]}");
+                    if (oddRow) fieldArray[i, j++] = checkers;
+                    else fieldArray[i, ++j] = checkers;
                 }
             }
+            return fieldArray;
+        }
 
-            if (anotherPos == false || YPos == -1 || XPos == -1)
-            {
-                throw WrongCoordinatesException;
+        private void SetPlayers(out CheckersPlayer whitePlayer, CheckersPlayerType whiteType, out CheckersPlayer blackPlayer, CheckersPlayerType blackType)
+        {
+            CheckersPlayerType playerType = whiteType;
+            CheckersPlayerSide playerSide = CheckersPlayerSide.White;
+            CheckersPlayer currentPlayer = null;
+            whitePlayer = blackPlayer = null;
+            while(whitePlayer == null || blackPlayer == null) { 
+
+                switch (playerType)
+                {
+                    case CheckersPlayerType.Ai :
+                        // IN FUTURE 
+                        break;
+                    case CheckersPlayerType.Player :
+                        currentPlayer = new Player(playerSide);
+                        break;
+                    case CheckersPlayerType.NetworkPlayer:
+                        // IN FUTURE
+                        break;
+                }
+                if (whitePlayer == null)
+                {
+                    whitePlayer = currentPlayer;
+                    playerSide = CheckersPlayerSide.Black;
+                    playerType = blackType;
+                }
+                else blackPlayer = currentPlayer;
             }
-            else
+        }
+
+        private CheckersPlayer ChangeMove(CheckersPlayer currentPlayer)
+        {
+            if (currentPlayer == null) return null;
+            CheckersPlayer nextPlayer;
+            nextPlayer = currentPlayer == whitePlayer ? blackPlayer : whitePlayer;
+            return nextPlayer;
+        }
+
+        private abstract class CheckersPlayer
+        {
+            public readonly CheckersPlayerSide playerSide;
+            public abstract bool DoMove(out (int x, int y) startCoordinates, out (int x, int y) finishCoordinates);
+
+            public CheckersPlayer(CheckersPlayerSide playerSide)
             {
-                finishPos.y = (sbyte)YPos;
-                finishPos.x = (sbyte)XPos;
+                this.playerSide = playerSide;
             }
+        }
+
+        private class Player : CheckersPlayer
+        {
+            public Player(CheckersPlayerSide playerSide) : base(playerSide) { }
             
-            return true;
+            public override bool DoMove(out (int x, int y) startCoordinates, out (int x, int y) finishCoordinates)
+            {
+                string coordinates;
+                if (RequestInput(out coordinates))
+                {
+                    if (ParseCoordinates(coordinates, out startCoordinates, out finishCoordinates)) return true;
+                    return false;
+                }
+                else
+                {
+                    startCoordinates = (-1,-1);
+                    finishCoordinates = (-1, -1);
+                    return false;
+                }
+            }
+
+            public bool RequestInput(out string coordinates)
+            {
+                coordinates = null;
+                string coordinateString = Console.ReadLine();
+                if (coordinateString != null)
+                {
+                    coordinates = coordinateString;
+                    return true;
+                }
+                else return false;
+            }
+
+            private bool ParseCoordinates(string coordinateString, out (int x, int y) startCoordinates, out (int x, int y) finishCoordinates)
+            {
+                startCoordinates = (-1, -1);
+                finishCoordinates = (-1, -1);
+                bool punctMark = false;
+
+                for(int i = 0;i < coordinateString.Length; i++)
+                {
+                    if (char.IsLetter(coordinateString[i]))
+                    {
+                        if (startCoordinates.x == -1) startCoordinates.x = char.ToUpper(coordinateString[i]) - 'A';
+
+                        else if (finishCoordinates.x == -1)
+                        {
+                            if (punctMark)
+                                finishCoordinates.x = char.ToUpper(coordinateString[i]) - 'A';
+                            else return false;
+                        }
+
+                        else return false;
+                    }
+                    else if (char.IsDigit(coordinateString[i]))
+                    {
+                        if (startCoordinates.y == -1)
+                        {
+                            startCoordinates.y = coordinateString[i] - '0';
+                        }
+
+                        else if (finishCoordinates.y == -1)
+                        {
+                            if (punctMark)
+                                finishCoordinates.y = coordinateString[i] - '0';
+                            else return false;
+                        }
+                        else return false;
+
+                    }
+                    else if (char.IsWhiteSpace(coordinateString[i])) continue;
+                    else if (char.IsPunctuation(coordinateString[i])) punctMark = true;
+                    else return false;
+                }
+                return Math.Min(startCoordinates.x, startCoordinates.y) >= 0 && Math.Min(finishCoordinates.x, finishCoordinates.y) >= 0;
+            }
+
             
         }
-
-        private void FieldPrep()
-        {
-            sbyte playerRows = (sbyte)((_fieldsize.y - 2) / 2);
-
-
-            bool set;
-            sbyte playerIndex = (sbyte)CheckerSide.black;
-            for (int i = 0; i < _fieldsize.y; i++)
-            {
-                set = !(i % 2 == 0);
-
-                if (i == playerRows)
-                {
-                    i += 2;
-                    playerIndex = (sbyte)CheckerSide.white;
-                }
-                for (int j = 0; j < _fieldsize.x; j++)
-                {
-                    if (set)
-                    {
-                        _field[i, j] = playerIndex;
-                        set = false;
-                    }
-                    else set = true;
-                }
-
-            }
-        }
-
-        private void CheckerPrep(List<Checker> checkersList)
-        {
-            for (sbyte i = 0; i < _fieldsize.y; i++)
-            {
-                for (sbyte j = 0; j < _fieldsize.x; j++)
-                {
-                    if (_field[i, j] != 0)
-                    {
-                        checkersList.Add(new Checker(CheckerType.ordinary, (CheckerSide)_field[i, j], new Coordinates(i, j)));
-                    }
-                }
-
-            }
-        }
-
-        private void QueueUpdate()
-        {
-            CheckersPlayer tempPlayer = _currentPlayer;
-            _currentPlayer = _nextPlayer;
-            _nextPlayer = tempPlayer;
-        }
-
-    }
-
-    internal class Checker
-    {
-        private CheckerType _checkerType;
-        private CheckerSide _checkerSide;
-        private Coordinates _coordinates;
-        public Dictionary<Coordinates, Coordinates> availableMoves;
-        public Dictionary<Coordinates, Coordinates> availableBeat;
-
-
-        public Coordinates checkerCoordinates
-        {
-            get
-            {
-                return _coordinates;
-            }
-            set
-            {
-                 _coordinates = value;
-            }
-        }
-        public CheckerType checkerType
-        {
-            get
-            {
-                return _checkerType;
-            }
-            set
-            {
-                if (_checkerType != value) _checkerType = value;
-            }
-        }
-
-        public CheckerSide checkerSide
-        {
-            get
-            {
-                return _checkerSide;
-            }
-            set
-            {
-                if (_checkerSide != value) _checkerSide = value;
-            }
-        }
-
-        public Checker(CheckerType type, CheckerSide side, Coordinates coordinates)
-        {
-            checkerType = type;
-            checkerSide = side;
-            checkerCoordinates = coordinates;
-            availableBeat = new Dictionary<Coordinates, Coordinates>();
-            availableMoves = new Dictionary<Coordinates, Coordinates>();
-        }
-
-    }
-
-    internal struct Coordinates
-    {
-        public sbyte x;
-        public sbyte y;
-
-        public Coordinates(sbyte y, sbyte x) 
-        {
-            this.x = x;
-            this.y = y;
-        }
-
     }
 
 }
