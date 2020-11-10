@@ -6,8 +6,9 @@ namespace CheckersAI.CheckersGameEngine
     {
         static void Main(string[] args)
         {
-            CheckersBoard board = new CheckersBoard(CheckersFieldSize.Medium, CheckersPlayerType.Player, CheckersPlayerType.Player);
-            board.MainGameLoopStart(true);
+            Board board = new Board(BoardSize.Medium,true,true);
+            board.GetAllPossiblePosition(true,true,(-1,-1));
+            
         }
     }
 }
