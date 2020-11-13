@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 
 namespace CheckersAI.CheckersGameEngine
 {
@@ -6,9 +7,8 @@ namespace CheckersAI.CheckersGameEngine
     {
         static void Main(string[] args)
         {
-            Board board = new Board(BoardSize.Medium,true,true,true);
+            Board board = new Board(BoardSize.Medium, true, true, true);
             board.GameLoop();
-            
         }
     }
 }
